@@ -3,7 +3,6 @@ Predictor - Makes predictions with all 4 models
 """
 
 import numpy as np
-import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.sparse import hstack, csr_matrix
 from config.settings import CATEGORY_RESOLVER_MAP, PRIORITY_MATRIX, DUPLICATE_SIMILARITY_THRESHOLD, CATEGORY_KEYWORDS
@@ -21,6 +20,43 @@ class TicketPredictor:
         # Feature names for audit trail
         self.feature_names = self.tfidf.get_feature_names_out()
         
+    def is_it_related(self, title, description):
+        """Check if ticket is IT-related or irrelevant"""
+        combined_text = f"{title} {description}".lower()
+        
+        # IT-related keywords
+        it_keywords = [
+            'software', 'hardware', 'application', 'system', 'server', 'network', 'computer',
+            'laptop', 'desktop', 'printer', 'email', 'outlook', 'vpn', 'wifi', 'internet',
+            'database', 'sql', 'cloud', 'azure', 'aws', 'access', 'login', 'password',
+            'account', 'security', 'malware', 'virus', 'firewall', 'router', 'switch',
+            'monitor', 'keyboard', 'mouse', 'scanner', 'phone', 'mobile', 'tablet',
+            'error', 'issue', 'bug', 'crash', 'slow', 'not working', 'cannot connect',
+            'installation', 'update', 'patch', 'upgrade', 'license', 'website', 'portal',
+            'api', 'service', 'app', 'program', 'file', 'document', 'backup', 'recovery'
+        ]
+        
+        # Non-IT keywords (facilities, HR, etc.)
+        non_it_keywords = [
+            'water', 'leakage', 'plumbing', 'bathroom', 'toilet', 'sink', 'faucet',
+            'hvac', 'ac', 'heating', 'cooling', 'temperature', 'furniture', 'chair',
+            'desk', 'table', 'door', 'lock', 'key', 'parking', 'elevator', 'stairs',
+            'cleaning', 'janitor', 'trash', 'garbage', 'cafeteria', 'food', 'lunch',
+            'payroll', 'salary', 'leave', 'vacation', 'sick', 'benefits', 'hr',
+            'building', 'facility', 'maintenance', 'repair', 'construction'
+        ]
+        
+        # Count IT vs non-IT keyword matches
+        it_score = sum(1 for kw in it_keywords if kw in combined_text)
+        non_it_score = sum(1 for kw in non_it_keywords if kw in combined_text)
+        
+        # Only reject if clearly non-IT (non-IT score is significantly higher)
+        if non_it_score >= 3 and non_it_score > (it_score * 2):
+            return False, "Non-IT ticket detected. Please submit to appropriate department (Facilities/HR/Admin)."
+        
+        # Otherwise, accept it (let the ML model handle classification)
+        return True, None
+    
     def extract_keywords(self, text):
         """Extract category-specific keywords from text - matching training format"""
         text_lower = text.lower()
